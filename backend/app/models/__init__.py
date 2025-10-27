@@ -4,6 +4,7 @@ from app.models.template import Template, TemplateField
 from app.models.booking import Booking, BookingPhoto, BookingFieldValue
 from app.models.resource import Car, Driver, TourRep
 from app.models.payment import Payment
+from app.models.notification import Notification, NotificationType, NotificationStatus
 
 __all__ = [
     "User",
@@ -17,4 +18,7 @@ __all__ = [
     "Driver",
     "TourRep",
     "Payment",
+    "Notification",
+    "NotificationType",
+    "NotificationStatus",
 ]
