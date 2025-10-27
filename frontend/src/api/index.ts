@@ -105,14 +105,28 @@ export const api = {
 
   // Dashboard
   dashboard: {
-    getStats: (startDate?: string, endDate?: string) =>
-      apiClient.get<DashboardStats>('/dashboard/stats', {
-        params: { start_date: startDate, end_date: endDate },
-      }),
+    getStats: (params?: {
+      start_date?: string;
+      end_date?: string;
+      driver_id?: number;
+      tour_rep_id?: number;
+      car_id?: number;
+    }) =>
+      apiClient.get<DashboardStats>('/dashboard/stats', { params }),
     getTourRepStats: (tourRepId: number, startDate?: string, endDate?: string) =>
       apiClient.get(`/dashboard/tour-rep/${tourRepId}/stats`, {
         params: { start_date: startDate, end_date: endDate },
       }),
+    getAuditLogs: (params?: {
+      skip?: number;
+      limit?: number;
+      start_date?: string;
+      end_date?: string;
+      user_id?: number;
+      action?: string;
+      resource_type?: string;
+    }) =>
+      apiClient.get('/dashboard/audit-logs', { params }),
   },
 
   // Reports

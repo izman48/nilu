@@ -6,6 +6,7 @@ from app.models.booking import Booking, BookingPhoto, BookingFieldValue
 from app.models.resource import Car, Driver, TourRep
 from app.models.payment import Payment
 from app.models.notification import Notification, NotificationType, NotificationStatus
+from app.models.audit_log import AuditLog, AuditAction, AuditResourceType
 
 __all__ = [
     "Company",
@@ -23,4 +24,7 @@ __all__ = [
     "Notification",
     "NotificationType",
     "NotificationStatus",
+    "AuditLog",
+    "AuditAction",
+    "AuditResourceType",
 ]

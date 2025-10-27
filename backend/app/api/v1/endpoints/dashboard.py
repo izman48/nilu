@@ -10,6 +10,7 @@ from app.models.booking import Booking, BookingStatus
 from app.models.resource import Car, Driver, TourRep
 from app.models.customer import Customer
 from app.models.payment import Payment
+from app.models.audit_log import AuditLog
 
 router = APIRouter()
 
@@ -278,4 +279,67 @@ def get_tour_rep_stats(
             "total_revenue": total_revenue,
             "bookings_by_status": bookings_by_status
         }
+    }
+
+
+@router.get("/audit-logs")
+def get_audit_logs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    start_date: Optional[datetime] = Query(None, description="Filter from this date"),
+    end_date: Optional[datetime] = Query(None, description="Filter until this date"),
+    user_id: Optional[int] = Query(None, description="Filter by user"),
+    action: Optional[str] = Query(None, description="Filter by action"),
+    resource_type: Optional[str] = Query(None, description="Filter by resource type"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_view_analytics"))
+):
+    """Get audit logs for the dashboard. Only accessible to admin users."""
+    from fastapi import HTTPException, status as http_status
+    from app.models.user import UserRole
+
+    # Only admins can access audit logs
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can access audit logs"
+        )
+
+    # Build query
+    query = db.query(AuditLog).filter(AuditLog.account_id == current_user.account_id)
+
+    if start_date:
+        query = query.filter(AuditLog.created_at >= start_date)
+    if end_date:
+        query = query.filter(AuditLog.created_at <= end_date)
+    if user_id:
+        query = query.filter(AuditLog.user_id == user_id)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if resource_type:
+        query = query.filter(AuditLog.resource_type == resource_type)
+
+    # Get total count
+    total = query.count()
+
+    # Get paginated results
+    logs = query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit).all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "user_name": log.user_name,
+                "action": log.action.value,
+                "resource_type": log.resource_type.value,
+                "resource_id": log.resource_id,
+                "resource_name": log.resource_name,
+                "description": log.description,
+                "ip_address": log.ip_address,
+                "created_at": log.created_at,
+            }
+            for log in logs
+        ]
     }
