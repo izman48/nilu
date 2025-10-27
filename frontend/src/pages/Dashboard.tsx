@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/api';
-import { DashboardStats, Driver, TourRep, Car } from '@/types';
+import type { DashboardStats, Driver, TourRep, Car } from '@/types';
 import { formatCurrency, formatDate, getStatusColor, getStatusBadge } from '@/utils/format';
 import {
   TrendingUp,
