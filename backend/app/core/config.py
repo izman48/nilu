@@ -25,6 +25,23 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: list = ["http://localhost:5173", "http://localhost:3000"]
 
+    # Email Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM: Optional[str] = None
+
+    # SMS Configuration (Twilio)
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_FROM_NUMBER: Optional[str] = None
+
+    # Firebase Configuration (Optional)
+    FIREBASE_CREDENTIALS_PATH: Optional[str] = None
+    FIREBASE_STORAGE_BUCKET: Optional[str] = None
+    USE_FIREBASE_STORAGE: bool = False  # Set to True to use Firebase instead of local storage
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -14,6 +14,7 @@ class CarBase(BaseModel):
     seating_capacity: Optional[int] = None
     daily_rate: Optional[Decimal] = None
     notes: Optional[str] = None
+    image_path: Optional[str] = None
 
 
 class CarCreate(CarBase):
@@ -30,6 +31,7 @@ class CarUpdate(BaseModel):
     seating_capacity: Optional[int] = None
     daily_rate: Optional[Decimal] = None
     notes: Optional[str] = None
+    image_path: Optional[str] = None
 
 
 class CarResponse(CarBase):

@@ -39,6 +39,13 @@ export const api = {
     create: (data: Partial<Car>) => apiClient.post<Car>('/resources/cars', data),
     update: (id: number, data: Partial<Car>) => apiClient.put<Car>(`/resources/cars/${id}`, data),
     delete: (id: number) => apiClient.delete(`/resources/cars/${id}`),
+    uploadImage: (id: number, file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return apiClient.post<Car>(`/resources/cars/${id}/upload-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
   },
 
   drivers: {
@@ -105,14 +112,68 @@ export const api = {
 
   // Dashboard
   dashboard: {
-    getStats: (startDate?: string, endDate?: string) =>
-      apiClient.get<DashboardStats>('/dashboard/stats', {
-        params: { start_date: startDate, end_date: endDate },
-      }),
+    getStats: (params?: {
+      start_date?: string;
+      end_date?: string;
+      driver_id?: number;
+      tour_rep_id?: number;
+      car_id?: number;
+    }) =>
+      apiClient.get<DashboardStats>('/dashboard/stats', { params }),
     getTourRepStats: (tourRepId: number, startDate?: string, endDate?: string) =>
       apiClient.get(`/dashboard/tour-rep/${tourRepId}/stats`, {
         params: { start_date: startDate, end_date: endDate },
       }),
+    getAuditLogs: (params?: {
+      skip?: number;
+      limit?: number;
+      start_date?: string;
+      end_date?: string;
+      user_id?: number;
+      action?: string;
+      resource_type?: string;
+    }) =>
+      apiClient.get('/dashboard/audit-logs', { params }),
+  },
+
+  // Reports
+  reports: {
+    downloadBookingsExcel: (startDate?: string, endDate?: string, status?: string) => {
+      return apiClient.get('/reports/bookings/excel', {
+        params: { start_date: startDate, end_date: endDate, status },
+        responseType: 'blob',
+      });
+    },
+    downloadBookingsPDF: (startDate?: string, endDate?: string, status?: string) => {
+      return apiClient.get('/reports/bookings/pdf', {
+        params: { start_date: startDate, end_date: endDate, status },
+        responseType: 'blob',
+      });
+    },
+    downloadRevenueExcel: (startDate?: string, endDate?: string) => {
+      return apiClient.get('/reports/revenue/excel', {
+        params: { start_date: startDate, end_date: endDate },
+        responseType: 'blob',
+      });
+    },
+    downloadPaymentsExcel: (startDate?: string, endDate?: string) => {
+      return apiClient.get('/reports/payments/excel', {
+        params: { start_date: startDate, end_date: endDate },
+        responseType: 'blob',
+      });
+    },
+  },
+
+  // Notifications
+  notifications: {
+    sendEmail: (data: { to_email: string; subject: string; body: string; booking_id?: number }) =>
+      apiClient.post('/notifications/send-email', data),
+    sendSMS: (data: { to_phone: string; message: string; booking_id?: number }) =>
+      apiClient.post('/notifications/send-sms', data),
+    sendBookingNotification: (data: { booking_id: number; notification_type: string; template: string }) =>
+      apiClient.post('/notifications/send-booking-notification', data),
+    list: (params?: any) => apiClient.get('/notifications', { params }),
+    get: (id: number) => apiClient.get(`/notifications/${id}`),
   },
 };
 

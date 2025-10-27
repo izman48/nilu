@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.models.user import User
 from app.models.booking import Booking, BookingFieldValue, BookingPhoto, BookingStatus
 from app.schemas.booking import BookingCreate, BookingUpdate, BookingResponse, BookingPhotoResponse
+from app.services.storage import storage_service
 
 router = APIRouter()
 
@@ -215,23 +216,20 @@ async def upload_booking_photo(
             detail=f"File type not allowed. Allowed types: {settings.ALLOWED_EXTENSIONS}"
         )
 
-    # Create upload directory if it doesn't exist
-    upload_dir = os.path.join(settings.UPLOAD_DIR, "bookings", str(booking_id))
-    os.makedirs(upload_dir, exist_ok=True)
+    # Read file content
+    content = await file.read()
+    if len(content) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File too large"
+        )
 
-    # Generate unique filename
-    unique_filename = f"{uuid.uuid4()}{file_ext}"
-    file_path = os.path.join(upload_dir, unique_filename)
-
-    # Save file
-    with open(file_path, "wb") as buffer:
-        content = await file.read()
-        if len(content) > settings.MAX_UPLOAD_SIZE:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="File too large"
-            )
-        buffer.write(content)
+    # Upload file using storage service (Firebase or local)
+    file_path = await storage_service.upload_file(
+        file_content=content,
+        filename=file.filename,
+        folder=f"bookings/{booking_id}"
+    )
 
     # Create photo record
     photo = BookingPhoto(
@@ -277,7 +275,7 @@ def get_booking_photos(
 
 
 @router.delete("/{booking_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_booking_photo(
+async def delete_booking_photo(
     booking_id: int,
     photo_id: int,
     db: Session = Depends(get_db),
@@ -307,9 +305,8 @@ def delete_booking_photo(
             detail="Booking not found"
         )
 
-    # Delete file from disk
-    if os.path.exists(photo.file_path):
-        os.remove(photo.file_path)
+    # Delete file using storage service
+    await storage_service.delete_file(photo.file_path)
 
     # Delete database record
     db.delete(photo)

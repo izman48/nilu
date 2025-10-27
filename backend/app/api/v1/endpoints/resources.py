@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import os
+import uuid
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_permission
 from app.models.user import User
@@ -10,6 +12,8 @@ from app.schemas.resource import (
     DriverCreate, DriverUpdate, DriverResponse,
     TourRepCreate, TourRepUpdate, TourRepResponse
 )
+from app.core.config import settings
+from app.services.storage import storage_service
 
 router = APIRouter()
 
@@ -131,6 +135,57 @@ def delete_car(
     db.commit()
 
     return None
+
+
+@router.post("/cars/{car_id}/upload-image", response_model=CarResponse)
+async def upload_car_image(
+    car_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_manage_resources"))
+):
+    """Upload an image for a car."""
+    # Check car exists
+    car = db.query(Car).filter(
+        Car.id == car_id,
+        Car.account_id == current_user.account_id
+    ).first()
+
+    if not car:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Car not found"
+        )
+
+    # Check file type
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File type not allowed. Allowed types: {settings.ALLOWED_EXTENSIONS}"
+        )
+
+    # Read file content
+    content = await file.read()
+    if len(content) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File too large"
+        )
+
+    # Upload file using storage service (Firebase or local)
+    file_path = await storage_service.upload_file(
+        file_content=content,
+        filename=file.filename,
+        folder="cars"
+    )
+
+    # Update car with image path
+    car.image_path = file_path
+    db.commit()
+    db.refresh(car)
+
+    return car
 
 
 # Driver Endpoints

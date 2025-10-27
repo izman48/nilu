@@ -1,11 +1,15 @@
+from app.models.company import Company
 from app.models.user import User
 from app.models.customer import Customer
 from app.models.template import Template, TemplateField
 from app.models.booking import Booking, BookingPhoto, BookingFieldValue
 from app.models.resource import Car, Driver, TourRep
 from app.models.payment import Payment
+from app.models.notification import Notification, NotificationType, NotificationStatus
+from app.models.audit_log import AuditLog, AuditAction, AuditResourceType
 
 __all__ = [
+    "Company",
     "User",
     "Customer",
     "Template",
@@ -17,4 +21,10 @@ __all__ = [
     "Driver",
     "TourRep",
     "Payment",
+    "Notification",
+    "NotificationType",
+    "NotificationStatus",
+    "AuditLog",
+    "AuditAction",
+    "AuditResourceType",
 ]

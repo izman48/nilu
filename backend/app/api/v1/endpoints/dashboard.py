@@ -10,6 +10,7 @@ from app.models.booking import Booking, BookingStatus
 from app.models.resource import Car, Driver, TourRep
 from app.models.customer import Customer
 from app.models.payment import Payment
+from app.models.audit_log import AuditLog
 
 router = APIRouter()
 
@@ -18,59 +19,81 @@ router = APIRouter()
 def get_dashboard_stats(
     start_date: Optional[datetime] = Query(None, description="Filter from this date"),
     end_date: Optional[datetime] = Query(None, description="Filter until this date"),
+    driver_id: Optional[int] = Query(None, description="Filter by driver"),
+    tour_rep_id: Optional[int] = Query(None, description="Filter by tour rep"),
+    car_id: Optional[int] = Query(None, description="Filter by car"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("can_view_analytics"))
 ):
-    """Get dashboard statistics."""
+    """Get dashboard statistics. Only accessible to admin users."""
+    from fastapi import HTTPException, status as http_status
+    from app.models.user import UserRole
+
+    # Only admins can access dashboard
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can access the dashboard"
+        )
+
     # Default to last 30 days if no dates provided
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
 
-    account_filter = Booking.account_id == current_user.account_id
-    date_filter = and_(
-        Booking.start_date >= start_date,
-        Booking.start_date <= end_date
-    )
+    # Build filters
+    filters = [Booking.account_id == current_user.account_id]
+    filters.append(Booking.start_date >= start_date)
+    filters.append(Booking.start_date <= end_date)
+
+    if driver_id:
+        filters.append(Booking.driver_id == driver_id)
+    if tour_rep_id:
+        filters.append(Booking.tour_rep_id == tour_rep_id)
+    if car_id:
+        filters.append(Booking.car_id == car_id)
+
+    combined_filter = and_(*filters)
 
     # Total bookings
     total_bookings = db.query(func.count(Booking.id)).filter(
-        account_filter, date_filter
+        combined_filter
     ).scalar()
 
     # Bookings by status
     bookings_by_status = {}
     for status in BookingStatus:
         count = db.query(func.count(Booking.id)).filter(
-            account_filter,
-            date_filter,
+            combined_filter,
             Booking.status == status
         ).scalar()
         bookings_by_status[status.value] = count
 
     # Revenue stats
     total_revenue = db.query(func.sum(Booking.total_amount)).filter(
-        account_filter, date_filter
+        combined_filter
     ).scalar() or 0
 
     total_paid = db.query(func.sum(Booking.paid_amount)).filter(
-        account_filter, date_filter
+        combined_filter
     ).scalar() or 0
 
     total_outstanding = total_revenue - total_paid
 
-    # Top performing tour reps
-    top_tour_reps = db.query(
-        TourRep.id,
-        TourRep.full_name,
-        func.count(Booking.id).label("booking_count"),
-        func.sum(Booking.total_amount).label("total_revenue")
-    ).join(Booking, Booking.tour_rep_id == TourRep.id).filter(
-        account_filter, date_filter
-    ).group_by(TourRep.id, TourRep.full_name).order_by(
-        func.count(Booking.id).desc()
-    ).limit(10).all()
+    # Top performing tour reps (skip if filtering by specific tour rep)
+    top_tour_reps = []
+    if not tour_rep_id:
+        top_tour_reps = db.query(
+            TourRep.id,
+            TourRep.full_name,
+            func.count(Booking.id).label("booking_count"),
+            func.sum(Booking.total_amount).label("total_revenue")
+        ).join(Booking, Booking.tour_rep_id == TourRep.id).filter(
+            combined_filter
+        ).group_by(TourRep.id, TourRep.full_name).order_by(
+            func.count(Booking.id).desc()
+        ).limit(10).all()
 
     top_tour_reps_data = [
         {
@@ -82,18 +105,20 @@ def get_dashboard_stats(
         for rep in top_tour_reps
     ]
 
-    # Most used cars
-    top_cars = db.query(
-        Car.id,
-        Car.registration_number,
-        Car.make,
-        Car.model,
-        func.count(Booking.id).label("booking_count")
-    ).join(Booking, Booking.car_id == Car.id).filter(
-        account_filter, date_filter, Booking.car_id.isnot(None)
-    ).group_by(Car.id, Car.registration_number, Car.make, Car.model).order_by(
-        func.count(Booking.id).desc()
-    ).limit(10).all()
+    # Most used cars (skip if filtering by specific car)
+    top_cars = []
+    if not car_id:
+        top_cars = db.query(
+            Car.id,
+            Car.registration_number,
+            Car.make,
+            Car.model,
+            func.count(Booking.id).label("booking_count")
+        ).join(Booking, Booking.car_id == Car.id).filter(
+            combined_filter, Booking.car_id.isnot(None)
+        ).group_by(Car.id, Car.registration_number, Car.make, Car.model).order_by(
+            func.count(Booking.id).desc()
+        ).limit(10).all()
 
     top_cars_data = [
         {
@@ -105,16 +130,18 @@ def get_dashboard_stats(
         for car in top_cars
     ]
 
-    # Most used drivers
-    top_drivers = db.query(
-        Driver.id,
-        Driver.full_name,
-        func.count(Booking.id).label("booking_count")
-    ).join(Booking, Booking.driver_id == Driver.id).filter(
-        account_filter, date_filter, Booking.driver_id.isnot(None)
-    ).group_by(Driver.id, Driver.full_name).order_by(
-        func.count(Booking.id).desc()
-    ).limit(10).all()
+    # Most used drivers (skip if filtering by specific driver)
+    top_drivers = []
+    if not driver_id:
+        top_drivers = db.query(
+            Driver.id,
+            Driver.full_name,
+            func.count(Booking.id).label("booking_count")
+        ).join(Booking, Booking.driver_id == Driver.id).filter(
+            combined_filter, Booking.driver_id.isnot(None)
+        ).group_by(Driver.id, Driver.full_name).order_by(
+            func.count(Booking.id).desc()
+        ).limit(10).all()
 
     top_drivers_data = [
         {
@@ -144,7 +171,7 @@ def get_dashboard_stats(
 
     # Recent bookings
     recent_bookings = db.query(Booking).filter(
-        account_filter
+        combined_filter
     ).order_by(Booking.created_at.desc()).limit(10).all()
 
     recent_bookings_data = [
@@ -252,4 +279,67 @@ def get_tour_rep_stats(
             "total_revenue": total_revenue,
             "bookings_by_status": bookings_by_status
         }
+    }
+
+
+@router.get("/audit-logs")
+def get_audit_logs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    start_date: Optional[datetime] = Query(None, description="Filter from this date"),
+    end_date: Optional[datetime] = Query(None, description="Filter until this date"),
+    user_id: Optional[int] = Query(None, description="Filter by user"),
+    action: Optional[str] = Query(None, description="Filter by action"),
+    resource_type: Optional[str] = Query(None, description="Filter by resource type"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_view_analytics"))
+):
+    """Get audit logs for the dashboard. Only accessible to admin users."""
+    from fastapi import HTTPException, status as http_status
+    from app.models.user import UserRole
+
+    # Only admins can access audit logs
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can access audit logs"
+        )
+
+    # Build query
+    query = db.query(AuditLog).filter(AuditLog.account_id == current_user.account_id)
+
+    if start_date:
+        query = query.filter(AuditLog.created_at >= start_date)
+    if end_date:
+        query = query.filter(AuditLog.created_at <= end_date)
+    if user_id:
+        query = query.filter(AuditLog.user_id == user_id)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if resource_type:
+        query = query.filter(AuditLog.resource_type == resource_type)
+
+    # Get total count
+    total = query.count()
+
+    # Get paginated results
+    logs = query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit).all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "user_name": log.user_name,
+                "action": log.action.value,
+                "resource_type": log.resource_type.value,
+                "resource_id": log.resource_id,
+                "resource_name": log.resource_name,
+                "description": log.description,
+                "ip_address": log.ip_address,
+                "created_at": log.created_at,
+            }
+            for log in logs
+        ]
     }

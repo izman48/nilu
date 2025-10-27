@@ -43,6 +43,7 @@ export interface Car {
   seating_capacity?: number;
   daily_rate?: number;
   notes?: string;
+  image_path?: string;
   account_id: string;
   created_at: string;
   updated_at?: string;
