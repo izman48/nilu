@@ -163,11 +163,10 @@ const Dashboard: React.FC = () => {
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition ${
-            hasActiveFilters
-              ? 'border-primary-600 bg-primary-50 text-primary-600'
-              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition ${hasActiveFilters
+            ? 'border-primary-600 bg-primary-50 text-primary-600'
+            : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
         >
           <Filter className="h-5 w-5" />
           Filters
@@ -353,7 +352,7 @@ const Dashboard: React.FC = () => {
               <p className="text-sm text-gray-600">Total</p>
               <p className="text-2xl font-bold text-gray-900">{stats.resources.cars.total}</p>
             </div>
-            <Car className="h-12 w-12 text-gray-300" />
+            <CarIcon className="h-12 w-12 text-gray-300" />
           </div>
         </div>
 
