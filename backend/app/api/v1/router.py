@@ -7,7 +7,9 @@ from app.api.v1.endpoints import (
     templates,
     bookings,
     payments,
-    dashboard
+    dashboard,
+    notifications,
+    reports
 )
 
 api_router = APIRouter()
@@ -35,3 +37,9 @@ api_router.include_router(payments.router, prefix="/payments", tags=["payments"]
 
 # Dashboard & Analytics
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+
+# Notifications
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+
+# Reports
+api_router.include_router(reports.router, prefix="/reports", tags=["reports"])

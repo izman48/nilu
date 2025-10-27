@@ -114,6 +114,46 @@ export const api = {
         params: { start_date: startDate, end_date: endDate },
       }),
   },
+
+  // Reports
+  reports: {
+    downloadBookingsExcel: (startDate?: string, endDate?: string, status?: string) => {
+      return apiClient.get('/reports/bookings/excel', {
+        params: { start_date: startDate, end_date: endDate, status },
+        responseType: 'blob',
+      });
+    },
+    downloadBookingsPDF: (startDate?: string, endDate?: string, status?: string) => {
+      return apiClient.get('/reports/bookings/pdf', {
+        params: { start_date: startDate, end_date: endDate, status },
+        responseType: 'blob',
+      });
+    },
+    downloadRevenueExcel: (startDate?: string, endDate?: string) => {
+      return apiClient.get('/reports/revenue/excel', {
+        params: { start_date: startDate, end_date: endDate },
+        responseType: 'blob',
+      });
+    },
+    downloadPaymentsExcel: (startDate?: string, endDate?: string) => {
+      return apiClient.get('/reports/payments/excel', {
+        params: { start_date: startDate, end_date: endDate },
+        responseType: 'blob',
+      });
+    },
+  },
+
+  // Notifications
+  notifications: {
+    sendEmail: (data: { to_email: string; subject: string; body: string; booking_id?: number }) =>
+      apiClient.post('/notifications/send-email', data),
+    sendSMS: (data: { to_phone: string; message: string; booking_id?: number }) =>
+      apiClient.post('/notifications/send-sms', data),
+    sendBookingNotification: (data: { booking_id: number; notification_type: string; template: string }) =>
+      apiClient.post('/notifications/send-booking-notification', data),
+    list: (params?: any) => apiClient.get('/notifications', { params }),
+    get: (id: number) => apiClient.get(`/notifications/${id}`),
+  },
 };
 
 export default api;
