@@ -34,6 +34,18 @@ class ApiClient {
           localStorage.removeItem('access_token');
           localStorage.removeItem('user');
           window.location.href = '/login';
+        } else if (error.response?.status === 403) {
+          // Forbidden - user doesn't have permission
+          const errorDetail = (error.response.data as any)?.detail || 'Access denied';
+
+          // Show error message
+          console.error('Access Forbidden:', errorDetail);
+
+          // If trying to access dashboard as non-admin, redirect to bookings
+          if (window.location.pathname === '/' || window.location.pathname.includes('dashboard')) {
+            alert('Access denied: Only administrators can access the dashboard');
+            window.location.href = '/bookings';
+          }
         }
         return Promise.reject(error);
       }

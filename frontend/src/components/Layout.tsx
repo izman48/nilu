@@ -30,13 +30,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard, show: user?.can_view_analytics },
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard, show: user?.role === 'admin' },
     { name: 'Bookings', href: '/bookings', icon: Calendar, show: true },
     { name: 'Customers', href: '/customers', icon: Users, show: true },
     { name: 'Resources', href: '/resources', icon: Car, show: true },
     { name: 'Templates', href: '/templates', icon: FileText, show: user?.can_manage_templates },
     { name: 'Payments', href: '/payments', icon: DollarSign, show: true },
-    { name: 'Users', href: '/users', icon: Settings, show: user?.can_manage_users },
+    { name: 'Users', href: '/users', icon: Settings, show: user?.role === 'admin' },
   ];
 
   const isActive = (href: string) => {

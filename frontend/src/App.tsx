@@ -10,6 +10,7 @@ import BookingDetail from './pages/BookingDetail';
 import BookingsCalendar from './pages/BookingsCalendar';
 import Customers from './pages/Customers';
 import Resources from './pages/Resources';
+import Users from './pages/Users';
 
 const App: React.FC = () => {
   return (
@@ -138,10 +139,7 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <Layout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">User Management</h2>
-                  <p className="text-gray-600">User management will be implemented here</p>
-                </div>
+                <Users />
               </Layout>
             </ProtectedRoute>
           }
