@@ -250,9 +250,13 @@ const Bookings: React.FC = () => {
                 </tr>
               ) : (
                 filteredBookings.map((booking) => (
-                  <tr key={booking.id} className="hover:bg-gray-50">
+                  <tr
+                    key={booking.id}
+                    onClick={() => navigate(`/bookings/${booking.id}`)}
+                    className="hover:bg-gray-50 cursor-pointer transition"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-medium text-gray-900">{booking.booking_number}</span>
+                      <span className="font-medium text-primary-600">{booking.booking_number}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
@@ -285,10 +289,13 @@ const Bookings: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
-                        onClick={() => navigate(`/bookings/${booking.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/bookings/${booking.id}/edit`);
+                        }}
                         className="text-primary-600 hover:text-primary-900 font-medium"
                       >
-                        View
+                        Edit
                       </button>
                     </td>
                   </tr>

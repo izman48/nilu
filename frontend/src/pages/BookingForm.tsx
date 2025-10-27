@@ -4,6 +4,9 @@ import { api } from '@/api';
 import { Template, Customer, TourRep, Car, Driver, Booking, FieldType } from '@/types';
 import { formatDate } from '@/utils/format';
 import { ArrowLeft, Save, Plus, Search } from 'lucide-react';
+import AddCustomerModal from '@/components/AddCustomerModal';
+import AddCarModal from '@/components/AddCarModal';
+import AddDriverModal from '@/components/AddDriverModal';
 
 interface FormData {
   template_id: number | null;
@@ -34,6 +37,8 @@ const BookingForm: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [error, setError] = useState('');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showCarModal, setShowCarModal] = useState(false);
+  const [showDriverModal, setShowDriverModal] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     template_id: null,
@@ -115,6 +120,21 @@ const BookingForm: React.FC = () => {
     }));
   };
 
+  const handleCustomerAdded = (customer: Customer) => {
+    setCustomers([...customers, customer]);
+    setFormData({ ...formData, customer_id: customer.id });
+  };
+
+  const handleCarAdded = (car: Car) => {
+    setCars([...cars, car]);
+    setFormData({ ...formData, car_id: car.id });
+  };
+
+  const handleDriverAdded = (driver: Driver) => {
+    setDrivers([...drivers, driver]);
+    setFormData({ ...formData, driver_id: driver.id });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -126,23 +146,34 @@ const BookingForm: React.FC = () => {
 
     setLoading(true);
     try {
+      // Convert field_values object to array format expected by backend
+      const fieldValuesArray = Object.entries(formData.field_values).map(([field_name, field_value]) => ({
+        field_name,
+        field_value,
+      }));
+
+      // Convert date strings to ISO datetime format
+      const startDateTime = formData.start_date ? `${formData.start_date}T00:00:00` : '';
+      const endDateTime = formData.end_date ? `${formData.end_date}T23:59:59` : '';
+
       const payload = {
         template_id: formData.template_id,
         customer_id: formData.customer_id,
         tour_rep_id: formData.tour_rep_id,
         car_id: formData.car_id,
         driver_id: formData.driver_id,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
+        start_date: startDateTime,
+        end_date: endDateTime,
         total_amount: formData.total_amount,
         notes: formData.notes,
-        status: formData.status,
-        field_values: formData.field_values,
+        field_values: fieldValuesArray,
       };
 
       if (isEdit && id) {
-        await api.bookings.update(parseInt(id), payload);
+        // Include status for updates
+        await api.bookings.update(parseInt(id), { ...payload, status: formData.status });
       } else {
+        // Don't send status for create (backend sets it to PENDING)
         await api.bookings.create(payload);
       }
 
@@ -311,19 +342,29 @@ const BookingForm: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Customer *
               </label>
-              <select
-                value={formData.customer_id || ''}
-                onChange={(e) => setFormData({ ...formData, customer_id: parseInt(e.target.value) })}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              >
-                <option value="">Select a customer</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.full_name} {customer.email && `(${customer.email})`}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={formData.customer_id || ''}
+                  onChange={(e) => setFormData({ ...formData, customer_id: parseInt(e.target.value) })}
+                  required
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                >
+                  <option value="">Select a customer</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.full_name} {customer.email && `(${customer.email})`}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerModal(true)}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1"
+                  title="Add new customer"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div>
@@ -349,36 +390,56 @@ const BookingForm: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Car (Optional)
               </label>
-              <select
-                value={formData.car_id || ''}
-                onChange={(e) => setFormData({ ...formData, car_id: e.target.value ? parseInt(e.target.value) : null })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              >
-                <option value="">No car assigned</option>
-                {cars.filter(c => c.is_available).map((car) => (
-                  <option key={car.id} value={car.id}>
-                    {car.make} {car.model} ({car.registration_number})
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={formData.car_id || ''}
+                  onChange={(e) => setFormData({ ...formData, car_id: e.target.value ? parseInt(e.target.value) : null })}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                >
+                  <option value="">No car assigned</option>
+                  {cars.filter(c => c.is_available).map((car) => (
+                    <option key={car.id} value={car.id}>
+                      {car.make} {car.model} ({car.registration_number})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowCarModal(true)}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1"
+                  title="Add new car"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Driver (Optional)
               </label>
-              <select
-                value={formData.driver_id || ''}
-                onChange={(e) => setFormData({ ...formData, driver_id: e.target.value ? parseInt(e.target.value) : null })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              >
-                <option value="">No driver assigned</option>
-                {drivers.filter(d => d.is_available).map((driver) => (
-                  <option key={driver.id} value={driver.id}>
-                    {driver.full_name} ({driver.phone})
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={formData.driver_id || ''}
+                  onChange={(e) => setFormData({ ...formData, driver_id: e.target.value ? parseInt(e.target.value) : null })}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                >
+                  <option value="">No driver assigned</option>
+                  {drivers.filter(d => d.is_available).map((driver) => (
+                    <option key={driver.id} value={driver.id}>
+                      {driver.full_name} ({driver.phone})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowDriverModal(true)}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1"
+                  title="Add new driver"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div>
@@ -496,6 +557,23 @@ const BookingForm: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Modals */}
+      <AddCustomerModal
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        onCustomerAdded={handleCustomerAdded}
+      />
+      <AddCarModal
+        isOpen={showCarModal}
+        onClose={() => setShowCarModal(false)}
+        onCarAdded={handleCarAdded}
+      />
+      <AddDriverModal
+        isOpen={showDriverModal}
+        onClose={() => setShowDriverModal(false)}
+        onDriverAdded={handleDriverAdded}
+      />
     </div>
   );
 };
