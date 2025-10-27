@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/api';
-import { Template, Customer, TourRep, Car, Driver, Booking, FieldType } from '@/types';
-import { formatDate } from '@/utils/format';
-import { ArrowLeft, Save, Plus, Search } from 'lucide-react';
+import { Template, Customer, TourRep, Car, Driver } from '@/types';
+import { ArrowLeft, Save, Plus, Upload, X } from 'lucide-react';
 import AddCustomerModal from '@/components/AddCustomerModal';
 import AddCarModal from '@/components/AddCarModal';
 import AddDriverModal from '@/components/AddDriverModal';
+import AddTourRepModal from '@/components/AddTourRepModal';
+import { toast } from 'react-hot-toast';
 
 interface FormData {
   template_id: number | null;
@@ -20,6 +21,11 @@ interface FormData {
   notes: string;
   status: 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled';
   field_values: Record<string, string>;
+}
+
+interface FileUpload {
+  file: File;
+  preview: string;
 }
 
 const BookingForm: React.FC = () => {
@@ -37,8 +43,10 @@ const BookingForm: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [error, setError] = useState('');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showTourRepModal, setShowTourRepModal] = useState(false);
   const [showCarModal, setShowCarModal] = useState(false);
   const [showDriverModal, setShowDriverModal] = useState(false);
+  const [fileUploads, setFileUploads] = useState<Record<string, FileUpload>>({});
 
   const [formData, setFormData] = useState<FormData>({
     template_id: null,
@@ -120,9 +128,46 @@ const BookingForm: React.FC = () => {
     }));
   };
 
+  const handleFileSelect = (fieldName: string, file: File | null) => {
+    if (!file) {
+      // Remove file
+      const newUploads = { ...fileUploads };
+      delete newUploads[fieldName];
+      setFileUploads(newUploads);
+      handleFieldValueChange(fieldName, '');
+      return;
+    }
+
+    // Validate file
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFileUploads(prev => ({
+        ...prev,
+        [fieldName]: {
+          file,
+          preview: reader.result as string
+        }
+      }));
+      // Store filename temporarily
+      handleFieldValueChange(fieldName, file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCustomerAdded = (customer: Customer) => {
     setCustomers([...customers, customer]);
     setFormData({ ...formData, customer_id: customer.id });
+  };
+
+  const handleTourRepAdded = (tourRep: TourRep) => {
+    setTourReps([...tourReps, tourRep]);
+    setFormData({ ...formData, tour_rep_id: tourRep.id });
   };
 
   const handleCarAdded = (car: Car) => {
@@ -169,18 +214,43 @@ const BookingForm: React.FC = () => {
         field_values: fieldValuesArray,
       };
 
+      let bookingId: number;
       if (isEdit && id) {
         // Include status for updates
         await api.bookings.update(parseInt(id), { ...payload, status: formData.status });
+        bookingId = parseInt(id);
+        toast.success('Booking updated successfully');
       } else {
         // Don't send status for create (backend sets it to PENDING)
-        await api.bookings.create(payload);
+        const response = await api.bookings.create(payload);
+        bookingId = response.data.id;
+        toast.success('Booking created successfully');
+      }
+
+      // Upload files for file-type fields
+      if (Object.keys(fileUploads).length > 0) {
+        const uploadPromises = Object.entries(fileUploads).map(async ([fieldName, upload]) => {
+          try {
+            // Find the field to get its label
+            const field = selectedTemplate?.fields.find(f => f.field_name === fieldName);
+            const description = field ? `${field.field_label}` : fieldName;
+
+            await api.bookings.uploadPhoto(bookingId, upload.file, 'document', description);
+          } catch (err) {
+            console.error(`Failed to upload file for ${fieldName}:`, err);
+            toast.error(`Failed to upload ${fieldName}`);
+          }
+        });
+
+        await Promise.all(uploadPromises);
+        toast.success('Files uploaded successfully');
       }
 
       navigate('/bookings');
     } catch (error: any) {
       console.error('Failed to save booking:', error);
       setError(error.response?.data?.detail || 'Failed to save booking');
+      toast.error(error.response?.data?.detail || 'Failed to save booking');
     } finally {
       setLoading(false);
     }
@@ -273,6 +343,54 @@ const BookingForm: React.FC = () => {
             onChange={(e) => handleFieldValueChange(field.field_name, e.target.checked.toString())}
             className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
           />
+        );
+
+      case 'file':
+        const fileUpload = fileUploads[field.field_name];
+        return (
+          <div className="space-y-2">
+            {fileUpload ? (
+              <div className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg bg-gray-50">
+                {fileUpload.file.type.startsWith('image/') ? (
+                  <img
+                    src={fileUpload.preview}
+                    alt="Preview"
+                    className="h-16 w-16 object-cover rounded"
+                  />
+                ) : (
+                  <div className="h-16 w-16 bg-gray-200 rounded flex items-center justify-center">
+                    <Upload className="h-8 w-8 text-gray-400" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{fileUpload.file.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {(fileUpload.file.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFileSelect(field.field_name, null)}
+                  className="p-1 text-red-600 hover:bg-red-50 rounded"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-500 hover:bg-primary-50 transition">
+                <Upload className="h-5 w-5 text-gray-400" />
+                <span className="text-sm text-gray-600">
+                  {field.placeholder || 'Choose file or drag and drop'}
+                </span>
+                <input
+                  type="file"
+                  onChange={(e) => handleFileSelect(field.field_name, e.target.files?.[0] || null)}
+                  className="hidden"
+                  required={field.is_required && !fileUpload}
+                />
+              </label>
+            )}
+          </div>
         );
 
       default:
@@ -371,19 +489,29 @@ const BookingForm: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tour Representative *
               </label>
-              <select
-                value={formData.tour_rep_id || ''}
-                onChange={(e) => setFormData({ ...formData, tour_rep_id: parseInt(e.target.value) })}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              >
-                <option value="">Select a tour rep</option>
-                {tourReps.filter(tr => tr.is_active).map((rep) => (
-                  <option key={rep.id} value={rep.id}>
-                    {rep.full_name} {rep.region && `(${rep.region})`}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={formData.tour_rep_id || ''}
+                  onChange={(e) => setFormData({ ...formData, tour_rep_id: parseInt(e.target.value) })}
+                  required
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                >
+                  <option value="">Select a tour rep</option>
+                  {tourReps.filter(tr => tr.is_active).map((rep) => (
+                    <option key={rep.id} value={rep.id}>
+                      {rep.full_name} {rep.region && `(${rep.region})`}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowTourRepModal(true)}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1"
+                  title="Add new tour representative"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div>
@@ -563,6 +691,11 @@ const BookingForm: React.FC = () => {
         isOpen={showCustomerModal}
         onClose={() => setShowCustomerModal(false)}
         onCustomerAdded={handleCustomerAdded}
+      />
+      <AddTourRepModal
+        isOpen={showTourRepModal}
+        onClose={() => setShowTourRepModal(false)}
+        onTourRepAdded={handleTourRepAdded}
       />
       <AddCarModal
         isOpen={showCarModal}

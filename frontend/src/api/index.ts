@@ -39,6 +39,13 @@ export const api = {
     create: (data: Partial<Car>) => apiClient.post<Car>('/resources/cars', data),
     update: (id: number, data: Partial<Car>) => apiClient.put<Car>(`/resources/cars/${id}`, data),
     delete: (id: number) => apiClient.delete(`/resources/cars/${id}`),
+    uploadImage: (id: number, file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return apiClient.post<Car>(`/resources/cars/${id}/upload-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
   },
 
   drivers: {

@@ -10,11 +10,8 @@ import {
   User,
   Car,
   UserCircle,
-  MapPin,
-  DollarSign,
   FileText,
   Image as ImageIcon,
-  Upload,
   CreditCard,
 } from 'lucide-react';
 
@@ -47,7 +44,7 @@ const BookingDetail: React.FC = () => {
 
   const loadPayments = async () => {
     try {
-      const response = await api.payments.list({ booking_id: parseInt(id!) });
+      const response = await api.payments.list(parseInt(id!));
       setPayments(response.data);
     } catch (error) {
       console.error('Failed to load payments:', error);

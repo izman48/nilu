@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@/api';
 import { User } from '@/types';
 import { formatDate } from '@/utils/format';
-import { Users as UsersIcon, Shield, Edit, Trash2, UserPlus, X } from 'lucide-react';
+import { Users as UsersIcon, Shield, Edit, Trash2, UserPlus } from 'lucide-react';
 
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);

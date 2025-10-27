@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -10,11 +11,13 @@ import BookingDetail from './pages/BookingDetail';
 import BookingsCalendar from './pages/BookingsCalendar';
 import Customers from './pages/Customers';
 import Resources from './pages/Resources';
+import Templates from './pages/Templates';
 import Users from './pages/Users';
 
 const App: React.FC = () => {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" />
       <Routes>
         <Route path="/login" element={<Login />} />
 
@@ -111,10 +114,7 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <Layout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Templates</h2>
-                  <p className="text-gray-600">Template management will be implemented here</p>
-                </div>
+                <Templates />
               </Layout>
             </ProtectedRoute>
           }

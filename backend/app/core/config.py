@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_FROM_NUMBER: Optional[str] = None
 
+    # Firebase Configuration (Optional)
+    FIREBASE_CREDENTIALS_PATH: Optional[str] = None
+    FIREBASE_STORAGE_BUCKET: Optional[str] = None
+    USE_FIREBASE_STORAGE: bool = False  # Set to True to use Firebase instead of local storage
+
     class Config:
         env_file = ".env"
         case_sensitive = True

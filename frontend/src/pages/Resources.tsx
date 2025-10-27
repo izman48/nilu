@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/api';
 import { Car, Driver, TourRep } from '@/types';
-import { Plus, Edit, Trash2, X, Car as CarIcon, UserCircle, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Car as CarIcon, UserCircle, Users, Upload, Image as ImageIcon } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { getCarImageUrl } from '@/utils/imageUrl';
 
 type TabType = 'cars' | 'drivers' | 'tour_reps';
 
@@ -108,6 +110,9 @@ const CarsTab: React.FC<{ cars: Car[]; onRefresh: () => void }> = ({ cars, onRef
   const [showModal, setShowModal] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
   const [error, setError] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     registration_number: '',
     make: '',
@@ -134,6 +139,7 @@ const CarsTab: React.FC<{ cars: Car[]; onRefresh: () => void }> = ({ cars, onRef
         is_available: car.is_available,
         notes: car.notes || '',
       });
+      setImagePreview(car.image_path || null);
     } else {
       setEditingCar(null);
       setFormData({
@@ -147,9 +153,31 @@ const CarsTab: React.FC<{ cars: Car[]; onRefresh: () => void }> = ({ cars, onRef
         is_available: true,
         notes: '',
       });
+      setImagePreview(null);
     }
+    setSelectedImage(null);
     setShowModal(true);
     setError('');
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,16 +192,37 @@ const CarsTab: React.FC<{ cars: Car[]; onRefresh: () => void }> = ({ cars, onRef
         daily_rate: formData.daily_rate ? parseFloat(formData.daily_rate) : undefined,
       };
 
+      let carId: number;
       if (editingCar) {
         await api.cars.update(editingCar.id, payload);
+        carId = editingCar.id;
+        toast.success('Car updated successfully');
       } else {
-        await api.cars.create(payload);
+        const response = await api.cars.create(payload);
+        carId = response.data.id;
+        toast.success('Car created successfully');
       }
+
+      // Upload image if selected
+      if (selectedImage) {
+        setUploading(true);
+        try {
+          await api.cars.uploadImage(carId, selectedImage);
+          toast.success('Image uploaded successfully');
+        } catch (imgError: any) {
+          console.error('Failed to upload image:', imgError);
+          toast.error('Car saved but image upload failed');
+        } finally {
+          setUploading(false);
+        }
+      }
+
       await onRefresh();
       setShowModal(false);
     } catch (error: any) {
       console.error('Failed to save car:', error);
       setError(error.response?.data?.detail || 'Failed to save car');
+      toast.error(error.response?.data?.detail || 'Failed to save car');
     }
   };
 
@@ -203,43 +252,62 @@ const CarsTab: React.FC<{ cars: Car[]; onRefresh: () => void }> = ({ cars, onRef
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {cars.map((car) => (
-          <div key={car.id} className="border rounded-lg p-4 hover:shadow-md transition">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="font-semibold text-gray-900">
-                  {car.make} {car.model}
-                </h3>
-                <p className="text-sm text-gray-500">{car.registration_number}</p>
+          <div key={car.id} className="border rounded-lg overflow-hidden hover:shadow-md transition">
+            {getCarImageUrl(car) ? (
+              <div className="h-48 bg-gray-100 relative">
+                <img
+                  src={getCarImageUrl(car)!}
+                  alt={`${car.make} ${car.model}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+                  }}
+                />
               </div>
-              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                car.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-              }`}>
-                {car.is_available ? 'Available' : 'In Use'}
-              </span>
-            </div>
+            ) : (
+              <div className="h-48 bg-gray-100 flex items-center justify-center">
+                <ImageIcon className="h-16 w-16 text-gray-300" />
+              </div>
+            )}
 
-            <div className="space-y-2 text-sm">
-              {car.year && <div className="text-gray-600">Year: {car.year}</div>}
-              {car.color && <div className="text-gray-600">Color: {car.color}</div>}
-              {car.seating_capacity && <div className="text-gray-600">Seats: {car.seating_capacity}</div>}
-              {car.daily_rate && <div className="text-gray-600">Rate: LKR {car.daily_rate}/day</div>}
-            </div>
+            <div className="p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    {car.make} {car.model}
+                  </h3>
+                  <p className="text-sm text-gray-500">{car.registration_number}</p>
+                </div>
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  car.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {car.is_available ? 'Available' : 'In Use'}
+                </span>
+              </div>
 
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-              <button
-                onClick={() => handleOpenModal(car)}
-                className="flex-1 text-primary-600 hover:bg-primary-50 px-3 py-2 rounded transition text-sm"
-              >
-                <Edit className="h-4 w-4 inline mr-1" />
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(car.id)}
-                className="flex-1 text-red-600 hover:bg-red-50 px-3 py-2 rounded transition text-sm"
-              >
-                <Trash2 className="h-4 w-4 inline mr-1" />
-                Delete
-              </button>
+              <div className="space-y-2 text-sm">
+                {car.year && <div className="text-gray-600">Year: {car.year}</div>}
+                {car.color && <div className="text-gray-600">Color: {car.color}</div>}
+                {car.seating_capacity && <div className="text-gray-600">Seats: {car.seating_capacity}</div>}
+                {car.daily_rate && <div className="text-gray-600">Rate: LKR {car.daily_rate}/day</div>}
+              </div>
+
+              <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                <button
+                  onClick={() => handleOpenModal(car)}
+                  className="flex-1 text-primary-600 hover:bg-primary-50 px-3 py-2 rounded transition text-sm"
+                >
+                  <Edit className="h-4 w-4 inline mr-1" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(car.id)}
+                  className="flex-1 text-red-600 hover:bg-red-50 px-3 py-2 rounded transition text-sm"
+                >
+                  <Trash2 className="h-4 w-4 inline mr-1" />
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -352,14 +420,56 @@ const CarsTab: React.FC<{ cars: Car[]; onRefresh: () => void }> = ({ cars, onRef
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   />
                 </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Car Image</label>
+                  <div className="flex items-start gap-4">
+                    {imagePreview && (
+                      <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
+                        <img
+                          src={imagePreview.startsWith('data:') || imagePreview.startsWith('http') ? imagePreview : getCarImageUrl({ image_path: imagePreview })!}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImagePreview(null);
+                            setSelectedImage(null);
+                          }}
+                          className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-500 hover:bg-primary-50 transition">
+                        <Upload className="h-5 w-5 text-gray-400" />
+                        <span className="text-sm text-gray-600">
+                          {selectedImage ? 'Change image' : 'Upload image'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-xs text-gray-500 mt-2">
+                        PNG, JPG, GIF up to 5MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-                  {editingCar ? 'Update' : 'Create'}
+                <button type="submit" disabled={uploading} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {uploading ? 'Uploading...' : editingCar ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>

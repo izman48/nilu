@@ -23,6 +23,7 @@ class Car(Base):
     seating_capacity = Column(Integer)
     daily_rate = Column(Numeric(10, 2))
     notes = Column(Text)
+    image_path = Column(String)  # Path to car image
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
