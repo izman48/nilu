@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
 import enum
@@ -31,8 +32,12 @@ class User(Base):
     can_view_analytics = Column(Boolean, default=False)
     can_manage_resources = Column(Boolean, default=False)
 
-    # User account identifier for future multi-tenancy
-    account_id = Column(String, default="default", nullable=False, index=True)
+    # Company relationship for multi-tenancy
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True, index=True)
+    account_id = Column(String, default="default", nullable=False, index=True)  # Keep for backward compatibility
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    company = relationship("Company", back_populates="users")

@@ -6,6 +6,7 @@ Creates initial admin user and sample data.
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, engine, Base
 from app.core.security import get_password_hash
+from app.models.company import Company
 from app.models.user import User, UserRole
 from app.models.template import Template, TemplateField, FieldType
 from app.models.resource import Car, Driver, TourRep
@@ -21,6 +22,25 @@ def init_db():
         print("Creating database tables...")
         Base.metadata.create_all(bind=engine)
 
+        # Create Nilu company if it doesn't exist
+        nilu_company = db.query(Company).filter(Company.account_id == "nilu").first()
+        if not nilu_company:
+            print("Creating Nilu company...")
+            nilu_company = Company(
+                name="Nilu Tourism",
+                account_id="nilu",
+                email="info@nilu.lk",
+                phone="+94112345678",
+                address="Colombo, Sri Lanka",
+                is_active=True,
+                plan_type="enterprise",
+                max_users=50,
+            )
+            db.add(nilu_company)
+            db.commit()
+            db.refresh(nilu_company)
+            print("Nilu company created")
+
         # Check if admin exists
         admin = db.query(User).filter(User.username == "admin").first()
         if not admin:
@@ -31,6 +51,8 @@ def init_db():
                 full_name="Admin User",
                 hashed_password=get_password_hash("admin123"),
                 role=UserRole.ADMIN,
+                company_id=nilu_company.id,
+                account_id="nilu",
                 can_create_bookings=True,
                 can_edit_bookings=True,
                 can_delete_bookings=True,
@@ -42,6 +64,13 @@ def init_db():
             db.add(admin)
             db.commit()
             print("Admin user created (username: admin, password: admin123)")
+        elif not admin.company_id:
+            # Update existing admin to be part of Nilu company
+            print("Updating admin user to be part of Nilu company...")
+            admin.company_id = nilu_company.id
+            admin.account_id = "nilu"
+            db.commit()
+            print("Admin user updated")
 
         # Create sample templates if none exist
         template_count = db.query(Template).count()
